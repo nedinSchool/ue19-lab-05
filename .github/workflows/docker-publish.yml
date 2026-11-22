@@ -71,9 +71,32 @@ jobs:
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
+            # Construire une image locale pour le scan, sans la publier
+      - name: Build Docker image for scan
+        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09
+        with:
+          context: .
+          load: true
+          push: false
+          tags: local-image:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Scanner les vulnerabilites avant la publication
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: local-image:scan
+          format: table
+          scanners: vuln
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      # Publier apres le scan, sauf pour les pull requests
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
+        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
